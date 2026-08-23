@@ -34,7 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // การจองคิว
+    // การจองคิว (สำหรับ คนไข้/ผู้ใช้ทั่วไป)
     Route::get('/queue/book', [QueueController::class, 'book'])->name('queue.book');
     Route::get('/queue/book/{scheduleId}', [QueueController::class, 'create'])->name('queues.create');
     Route::post('/queue/book', [QueueController::class, 'store'])->name('queues.store');
@@ -44,48 +44,47 @@ Route::middleware('auth')->group(function () {
     Route::patch('/queues/{id}/cancel', [QueueController::class, 'cancel'])->name('queues.cancel');
 
     // ------------------------------------------------------------------------
-    // 🌟 จัดการ Route ของ doctor-schedules (เรียงลำดับใหม่)
+    // Shared Access (Admin, Staff & Doctor) - ดูคิวและเปลี่ยนสถานะคิว
     // ------------------------------------------------------------------------
-
-    // 1. หน้าแสดงตารางรวม (เข้าได้ทุกคน)
-    Route::get('/doctor-schedules', [DoctorScheduleController::class, 'index'])->name('doctor-schedules.index');
-
-    // 2. หน้าสร้างตารางหมอ (ต้องวางไว้ก่อน {doctorSchedule} เสมอ)
-    Route::middleware('role:admin,staff')->group(function () {
-        Route::get('/doctor-schedules/create', [DoctorScheduleController::class, 'create'])->name('doctor-schedules.create');
-        Route::post('/doctor-schedules', [DoctorScheduleController::class, 'store'])->name('doctor-schedules.store');
-    });
-
-    // 3. หน้าแสดงรายละเอียดแบบรายบุคคล (เข้าได้ทุกคน)
-    Route::get('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'show'])->name('doctor-schedules.show');
-
-    // 4. แก้ไข และ ลบ ( Admin / Staff )
-    Route::middleware('role:admin,staff')->group(function () {
-        Route::get('/doctor-schedules/{doctorSchedule}/edit', [DoctorScheduleController::class, 'edit'])->name('doctor-schedules.edit');
-        Route::put('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'update'])->name('doctor-schedules.update');
-        Route::patch('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'update']);
-        Route::delete('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'destroy'])->name('doctor-schedules.destroy');
-
-        // จัดการคิว
+    Route::middleware('role:admin,staff,doctor')->group(function () {
         Route::get('/queues', [QueueController::class, 'index'])->name('queues.index');
         Route::patch('/queues/{id}/status', [QueueController::class, 'updateStatus'])->name('queues.updateStatus');
-        
-        // รายงาน PDF
+    });
+
+    // ------------------------------------------------------------------------
+    // Staff & Admin Access
+    // ------------------------------------------------------------------------
+    Route::middleware('role:admin,staff')->group(function () {
+        // จัดการตารางหมอ (วางเส้นทาง static ไว้ก่อน parameter)
+        Route::get('/doctor-schedules/create', [DoctorScheduleController::class, 'create'])->name('doctor-schedules.create');
+        Route::post('/doctor-schedules', [DoctorScheduleController::class, 'store'])->name('doctor-schedules.store');
+        Route::get('/doctor-schedules/{doctorSchedule}/edit', [DoctorScheduleController::class, 'edit'])->name('doctor-schedules.edit');
+        Route::put('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'update'])->name('doctor-schedules.update');
+        Route::delete('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'destroy'])->name('doctor-schedules.destroy');
+
+        // จัดการและออกรายงานคิว
         Route::get('/queues/export-pdf', [QueueController::class, 'exportPDF'])->name('queues.export-pdf');
         Route::get('/admin/queues/export-pdf', [QueueController::class, 'exportPDF'])->name('admin.queues.export-pdf');
+        
+        // รายงานระบบ
         Route::get('/report/daily', [ReportController::class, 'daily'])->name('report.daily');
-        Route::get('/admin/report/services/pdf', [ReportController::class, 'daily'])->name('report.service.pdf');
-        Route::get('/admin/users/export-pdf', [UserController::class, 'exportPDF'])->name('admin.users.export-pdf');
         Route::get('/reports/users/pdf', [ReportController::class, 'exportUsersPdf'])->name('reports.users.pdf');
     });
 
-    // --- หน้าคิวของหมอวันนี้ ---
+    // ตารางเวลาหมอ (เข้าชมได้ทุกคน)
+    Route::get('/doctor-schedules', [DoctorScheduleController::class, 'index'])->name('doctor-schedules.index');
+    Route::get('/doctor-schedules/{doctorSchedule}', [DoctorScheduleController::class, 'show'])->name('doctor-schedules.show');
+
+    // --- สำหรับหมอเท่านั้น ---
     Route::middleware('role:doctor')->group(function () {
-        Route::get('/doctor/queue', [QueueController::class, 'book'])->name('doctor.queue.list');
+        Route::get('/doctor/queue', [QueueController::class, 'doctorToday'])->name('doctor.queue.list');
+        // เพิ่มรองรับชื่อ queue.doctor-today เพื่อให้ Blade หน้าเก่า/เมนูเดิมทำงานได้ไม่เกิด RouteNotFoundException
+        Route::get('/doctor/today-queue', [QueueController::class, 'doctorToday'])->name('queue.doctor-today');
     });
 
     // --- จัดการผู้ใช้งาน: Admin เท่านั้น ---
     Route::middleware('role:admin')->group(function () {
+        Route::get('/admin/users/export-pdf', [UserController::class, 'exportPDF'])->name('admin.users.export-pdf');
         Route::resource('users', UserController::class);
     });
 });

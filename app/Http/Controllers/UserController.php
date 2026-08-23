@@ -59,12 +59,21 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        // 1. แปลงค่า input จาก form ให้เป็นตัวพิมพ์เล็กและตัดช่องว่าง
+        if ($request->has('role')) {
+            $request->merge(['role' => strtolower(trim($request->input('role')))]);
+        }
+        if ($request->has('status')) {
+            $request->merge(['status' => strtolower(trim($request->input('status')))]);
+        }
+
+        // 2. Validate โดยใช้ array_keys เพื่อดึงเฉพาะ Key (admin, staff, doctor, patient)
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(User::ROLES)],
-            'status' => ['required', Rule::in(User::STATUSES)],
+            'role' => ['required', Rule::in(array_keys(User::ROLES))],
+            'status' => ['required', Rule::in(array_keys(User::STATUSES))],
         ]);
 
         User::create([
@@ -90,15 +99,21 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        if ($request->has('role')) {
+            $request->merge(['role' => strtolower(trim($request->input('role')))]);
+        }
+        if ($request->has('status')) {
+            $request->merge(['status' => strtolower(trim($request->input('status')))]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-            'role' => ['required', Rule::in(User::ROLES)],
-            'status' => ['required', Rule::in(User::STATUSES)],
+            'role' => ['required', Rule::in(array_keys(User::ROLES))],
+            'status' => ['required', Rule::in(array_keys(User::STATUSES))],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
 
-        // แก้บั๊ก: ของเดิม $user->name = $user->name (เขียนทับด้วยค่าตัวเอง) ทำให้แก้ไขชื่อไม่ได้จริง
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->role = $validated['role'];
@@ -115,7 +130,6 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        // กันแอดมินลบบัญชีตัวเองจนล็อกตัวเองออกจากระบบ
         if ($user->id === auth()->id()) {
             return redirect()->route('users.index')->withErrors('ไม่สามารถลบบัญชีของตัวเองได้');
         }

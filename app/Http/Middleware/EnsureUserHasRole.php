@@ -16,12 +16,16 @@ class EnsureUserHasRole
             return redirect()->route('login');
         }
 
-        // ถ้าผู้ใช้เป็น patient แต่เข้าถึง route ที่ต้องใช้สิทธิ์ admin/staff ให้ Redirect ไปที่ queue.history
-        if ($user->isPatient() && ! in_array('patient', $roles, true)) {
+        // แปลงรายการ Roles ที่ส่งเข้ามาใน Middleware ให้เป็นตัวพิมพ์เล็กทั้งหมด
+        $allowedRoles = array_map('strtolower', $roles);
+
+        // ถ้าผู้ใช้เป็น patient แต่เข้าถึง route ที่ไม่เปิดสิทธิ์ให้ patient ให้ Redirect ไปที่ queue.history
+        if ($user->isPatient() && ! in_array('patient', $allowedRoles, true)) {
             return redirect()->route('queue.history');
         }
 
-        if (! $user->hasRole($roles)) {
+        // เช็คสิทธิ์ด้วย method hasRole() ใน User Model (ซึ่งรองรับการแปลงตัวพิมพ์เล็ก/ใหญ่แล้ว)
+        if (! $user->hasRole($allowedRoles)) {
             abort(403, 'Unauthorized action.');
         }
 

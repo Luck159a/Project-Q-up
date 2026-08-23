@@ -18,14 +18,14 @@ return new class extends Migration
             // เชื่อมไปยังตาราง users (ผู้ป่วยที่จอง)
             $table->foreignId('userId')->constrained('users')->onDelete('cascade');
             
-            $table->string('labelNo'); // เช่น A001, Q001
+            $table->string('labelNo')->nullable(); // เช่น A001, Q001
             $table->string('period');  // ช่วงเวลาที่คำนวณแล้ว เช่น 09:00 - 09:20
             $table->text('Note')->nullable();
             
-            // ⭐ แก้ไขแล้ว: เพิ่ม 'ยกเลิก' เข้าไปในรายการ enum เพื่อป้องกัน Error Data Truncated
-            $table->enum('status', ['รอเรียก', 'กำลังใช้บริการ', 'เสร็จสิ้น', 'ยกเลิก'])->default('รอเรียก');
+            // 🌟 ปรับเป็น string เพื่อรองรับทั้ง waiting, in_service, completed, cancelled และภาษาไทย
+            $table->string('status')->default('waiting');
             
-            $table->unsignedBigInteger('created_by'); // ID ของคนที่ทำรายการ (Admin หรือ User)
+            $table->unsignedBigInteger('created_by')->nullable(); // ID ของคนที่ทำรายการ (Admin หรือ User)
             $table->timestamps();
         });
     }

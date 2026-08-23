@@ -2,7 +2,6 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
-                
                 <!-- โลโก้ -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}">
@@ -18,10 +17,13 @@
                             {{ __('หน้าแรก') }}
                         </x-nav-link>
 
-                        <!-- เมนูตารางงานสำหรับหมอ -->
+                        <!-- 🌟 เมนูสำหรับ DOCTOR -->
                         @if (strtolower(auth()->user()->role) === 'doctor')
-                            <x-nav-link :href="route('queue.book')" :active="request()->routeIs('queue.book')">
-                                {{ __('ตารางงาน') }}
+                            <x-nav-link :href="route('queue.doctor-today')" :active="request()->routeIs('queue.doctor-today')">
+                                {{ __('คิวตรวจวันนี้') }}
+                            </x-nav-link>
+                            <x-nav-link :href="route('queues.index')" :active="request()->routeIs('queues.index')">
+                                {{ __('รายการคิวทั้งหมด') }}
                             </x-nav-link>
                         @endif
 
@@ -42,7 +44,7 @@
                                 {{ __('จัดการคิวเข้ารับบริการ') }}
                             </x-nav-link>
 
-                            <!-- 4. เมนูรายงาน (Dropdown) -->
+                            <!-- เมนูรายงาน (Dropdown) -->
                             <div class="hidden sm:flex sm:items-center">
                                 <x-dropdown align="right" width="48">
                                     <x-slot name="trigger">
@@ -70,13 +72,13 @@
                             </div>
                         @endif
 
-                        <!-- 5. เมนูเฉพาะ PATIENT -->
+                        <!-- 4. เมนูเฉพาะ PATIENT -->
                         @if (strtolower(auth()->user()->role) === 'patient')
                             <x-nav-link :href="route('doctor-schedules.index')" :active="request()->routeIs('doctor-schedules.index')">
-                                จองคิว
+                                {{ __('จองคิว') }}
                             </x-nav-link>
                             <x-nav-link :href="route('queue.history')" :active="request()->routeIs('queue.history')">
-                                ประวัติการจอง
+                                {{ __('ประวัติการจอง') }}
                             </x-nav-link>
                         @endif
                     @endauth
@@ -132,8 +134,11 @@
                 </x-responsive-nav-link>
 
                 @if (strtolower(auth()->user()->role) === 'doctor')
-                    <x-responsive-nav-link :href="route('queue.book')" :active="request()->routeIs('queue.book')">
-                        {{ __('ตารางงาน') }}
+                    <x-responsive-nav-link :href="route('queue.doctor-today')" :active="request()->routeIs('queue.doctor-today')">
+                        {{ __('คิวตรวจวันนี้') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('queues.index')" :active="request()->routeIs('queues.index')">
+                        {{ __('รายการคิวทั้งหมด') }}
                     </x-responsive-nav-link>
                 @endif
 

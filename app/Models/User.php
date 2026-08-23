@@ -58,36 +58,39 @@ class User extends Authenticatable
 
     public function hasRole(string|array $roles): bool
     {
+        $currentRole = strtolower($this->role ?? '');
+
         if (is_array($roles)) {
-            return in_array($this->role, $roles, true);
+            $allowed = array_map('strtolower', $roles);
+            return in_array($currentRole, $allowed, true);
         }
 
-        return $this->role === $roles;
+        return $currentRole === strtolower($roles);
     }
 
     public function isPatient(): bool
     {
-        return $this->role === self::ROLE_PATIENT;
+        return strtolower($this->role ?? '') === self::ROLE_PATIENT;
     }
 
     public function isDoctor(): bool
     {
-        return $this->role === self::ROLE_DOCTOR;
+        return strtolower($this->role ?? '') === self::ROLE_DOCTOR;
     }
 
     public function isStaff(): bool
     {
-        return $this->role === self::ROLE_STAFF;
+        return strtolower($this->role ?? '') === self::ROLE_STAFF;
     }
 
     public function isAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return strtolower($this->role ?? '') === self::ROLE_ADMIN;
     }
 
     public function isStaffOrAdmin(): bool
     {
-        return in_array($this->role, [self::ROLE_STAFF, self::ROLE_ADMIN], true);
+        return in_array(strtolower($this->role ?? ''), [self::ROLE_STAFF, self::ROLE_ADMIN], true);
     }
     
     public function queues(): HasMany

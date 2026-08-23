@@ -19,12 +19,12 @@ class QueueController extends Controller
 {
     public function __construct(protected QueueService $queueService) {}
 
-    /**
-     * Display: หน้ารวมรายการคิว (Staff/Admin เท่านั้น — บังคับด้วย route middleware 'role:admin,staff')
-     */
     public function index(Request $request)
     {
-        if (Auth::user()->isPatient()) {
+        $user = Auth::user();
+
+        // 🌟 ปรับปรุง: เฉพาะ Patient เท่านั้นที่จะถูก Redirect ไปดูประวัติตนเอง (Staff/Doctor/Admin จะเข้าดูหน้านี้ได้)
+        if ($user->isPatient()) {
             return redirect()->route('queue.history');
         }
 
@@ -68,30 +68,9 @@ class QueueController extends Controller
         return view('queues.index', compact('queues', 'availableDates'));
     }
 
-    /**
-     * Book: หน้าเลือกตารางหมอ (หมอจะเห็นคิวของตัวเองวันนี้แทน)
-     */
     public function book()
     {
-        $user = Auth::user();
-
-        if ($user->isDoctor()) {
-            $today = Carbon::today()->toDateString();
-
-            $todayQueues = Queue::with(['user', 'doctorSchedule'])
-                ->whereHas('doctorSchedule', function ($q) use ($user, $today) {
-                    $q->where('user_id', $user->id)
-                        ->where('schedule_date', $today);
-                })
-                ->where('status', '!=', Queue::STATUS_CANCELLED)
-                ->orderBy('period')
-                ->get();
-
-            $totalQueuesToday = $todayQueues->count();
-
-            return view('queues.doctor_today', compact('todayQueues', 'totalQueuesToday'));
-        }
-
+        // 🌟 ปรับปรุง: อนุญาตให้ทุก Role (รวมถึง Doctor/Staff) เข้าหน้าจองคิวได้
         $schedules = DoctorSchedule::with('user')
             ->where('schedule_date', '>=', now()->toDateString())
             ->where('status', '!=', 'cancelled')
@@ -101,9 +80,25 @@ class QueueController extends Controller
         return view('queues.book', compact('schedules'));
     }
 
-    /**
-     * Create View: เลือกช่วงเวลาที่จะจอง
-     */
+    public function doctorToday()
+    {
+        $user = Auth::user();
+        $today = Carbon::today()->toDateString();
+
+        $todayQueues = Queue::with(['user', 'doctorSchedule'])
+            ->whereHas('doctorSchedule', function ($q) use ($user, $today) {
+                $q->where('user_id', $user->id)
+                    ->where('schedule_date', $today);
+            })
+            ->where('status', '!=', Queue::STATUS_CANCELLED)
+            ->orderBy('period')
+            ->get();
+
+        $totalQueuesToday = $todayQueues->count();
+
+        return view('queues.doctor_today', compact('todayQueues', 'totalQueuesToday'));
+    }
+
     public function create(int $scheduleId)
     {
         $schedule = DoctorSchedule::with(['user', 'queues'])->findOrFail($scheduleId);
@@ -112,10 +107,6 @@ class QueueController extends Controller
         return view('queues.create', compact('schedule', 'slots'));
     }
 
-    /**
-     * Store: บันทึกข้อมูลการจองคิว (ตรรกะทั้งหมดอยู่ใน QueueService::bookQueue
-     * ซึ่งใช้ DB Transaction + lockForUpdate ป้องกัน Race Condition)
-     */
     public function store(StoreQueueRequest $request): RedirectResponse
     {
         try {
@@ -133,9 +124,6 @@ class QueueController extends Controller
         return redirect()->route('queue.success', $queue->id)->with('success', 'จองคิวสำเร็จแล้ว!');
     }
 
-    /**
-     * Success: หน้าแสดงใบยืนยันหลังจองสำเร็จ
-     */
     public function success(int $id)
     {
         $queue = Queue::with(['user', 'doctorSchedule.user'])->findOrFail($id);
@@ -144,9 +132,6 @@ class QueueController extends Controller
         return view('queues.success', compact('queue', 'queueBeforeCount', 'myOrder'));
     }
 
-    /**
-     * History: ดูประวัติการจอง (สำหรับคนไข้)
-     */
     public function history()
     {
         $queues = Queue::with(['doctorSchedule.user'])
@@ -157,9 +142,6 @@ class QueueController extends Controller
         return view('queues.history', compact('queues'));
     }
 
-    /**
-     * Update Status: สำหรับเจ้าหน้าที่เรียกคิว หรือจบงาน (ตรวจ State Machine + สิทธิ์ใน Service)
-     */
     public function updateStatus(UpdateQueueStatusRequest $request, int $id): RedirectResponse
     {
         try {
@@ -173,7 +155,6 @@ class QueueController extends Controller
             return redirect()->back()->withErrors($e->errors());
         }
 
-        // แจ้งเตือนแบบ Real-time เมื่อเจ้าหน้าที่เรียกคิว (ดู app/Events/QueueCalled.php)
         if ($queue->status === Queue::STATUS_IN_SERVICE) {
             broadcast(new QueueCalled($queue))->toOthers();
         }
@@ -181,9 +162,6 @@ class QueueController extends Controller
         return back()->with('success', 'อัปเดตสถานะสำเร็จ!');
     }
 
-    /**
-     * Cancel: ยกเลิกคิว (เจ้าของคิวเอง หรือ Staff/Admin — ตรวจสิทธิ์ใน Service)
-     */
     public function cancel(Request $request, int $id): RedirectResponse
     {
         try {
@@ -196,17 +174,13 @@ class QueueController extends Controller
             return redirect()->back()->withErrors($e->errors());
         }
 
-        return redirect()->back()->with('success', 'ยกเลิกคิวเรียบร้อยแล้ว ช่วงเวลานี้จะกลับมาว่างอีกครั้ง');
+        return redirect()->back()->with('success', 'ยกเลิกคิวเรียบร้อยแล้ว');
     }
 
-    /**
-     * ฟังก์ชันสำหรับสร้างไฟล์ PDF ใบยืนยันคิว (รายคน)
-     */
     public function exportTicketPDF(int $id)
     {
         $queue = Queue::with(['user', 'doctorSchedule.user'])->findOrFail($id);
 
-        // เจ้าของคิวเอง หรือ Staff/Admin เท่านั้นที่ดาวน์โหลดใบคิวได้
         if ($queue->userId !== Auth::id() && ! Auth::user()->isStaffOrAdmin()) {
             abort(403);
         }
@@ -223,11 +197,14 @@ class QueueController extends Controller
         return $pdf->stream('Queue-Ticket-'.$queue->labelNo.'.pdf');
     }
 
-    /**
-     * ฟังก์ชันสำหรับส่งออกรายงานคิวทั้งหมด หรือตามเงื่อนไขการค้นหา (PDF) — Staff/Admin เท่านั้น
-     */
     public function exportPDF(Request $request)
     {
+        // 🌟 ปรับปรุง: อนุญาตให้ Staff, Doctor และ Admin ออกรายงาน PDF ได้
+        $user = Auth::user();
+        if ($user->isPatient()) {
+            abort(403, 'คุณไม่มีสิทธิ์เข้าถึงรายงานนี้');
+        }
+
         $query = Queue::with(['user', 'doctorSchedule.user']);
 
         if ($request->filled('search')) {
@@ -247,9 +224,14 @@ class QueueController extends Controller
             $query->whereHas('doctorSchedule', function ($q) use ($request) {
                 $q->where('schedule_date', $request->date);
             });
+        } else {
+            $today = Carbon::today()->toDateString();
+            $query->whereHas('doctorSchedule', function ($q) use ($today) {
+                $q->where('schedule_date', $today);
+            });
         }
 
-        $queues = $query->orderBy('labelNo')->get();
+        $queues = $query->orderBy('labelNo')->limit(500)->get();
 
         $pdf = Pdf::loadView('reports.all_queues_pdf', compact('queues'))
             ->setPaper('a4', 'landscape')
@@ -261,9 +243,6 @@ class QueueController extends Controller
         return $pdf->stream('Queue-Report.pdf');
     }
 
-    /**
-     * @return array{0: int, 1: int} [จำนวนคิวก่อนหน้า, ลำดับของฉัน]
-     */
     protected function calculateQueuePosition(Queue $queue): array
     {
         $queueBeforeCount = Queue::where('docschId', $queue->docschId)

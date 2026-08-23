@@ -14,7 +14,7 @@ class ReportController extends Controller
     /**
      * สำหรับส่งออกรายงานผู้ใช้ทั้งหมด (Admin เท่านั้น)
      */
-    public function exportUserPDF() 
+    public function exportUsersPdf() 
     {
         if (!Auth::check() || strtolower(Auth::user()->role) !== 'admin') {
             abort(403, 'คุณไม่มีสิทธิ์เข้าถึงรายงานนี้');
@@ -27,6 +27,14 @@ class ReportController extends Controller
                   ->setOptions($this->getPdfOptions());
 
         return $pdf->stream('users_report_' . date('Y-m-d') . '.pdf');
+    }
+
+    /**
+     * Alias function รองรับการเรียกใช้แบบ exportUserPDF
+     */
+    public function exportUserPDF()
+    {
+        return $this->exportUsersPdf();
     }
 
     /**
